@@ -1,2 +1,4 @@
 aiogram==2.25.1
-yt-dlp
+aiohttp
+async-timeout
+python-dotenv
