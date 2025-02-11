@@ -20,27 +20,15 @@ logging.basicConfig(level=logging.INFO)
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher(bot)
 
-# Check if GDRIVE_CREDENTIALS exists
-if not GDRIVE_CREDENTIALS:
-    raise ValueError("GDRIVE_CREDENTIALS not found! Make sure it's set in Environment Variables.")
+logging.info("🚀 Bot Started! Waiting for commands...")
 
-# Create client_secrets.json file dynamically
-with open("client_secrets.json", "w") as f:
-    f.write(GDRIVE_CREDENTIALS)
-
-# Authenticate Google Drive
-logging.info("Authenticating Google Drive...")
+# Google Drive Authentication
+logging.info("🔑 Authenticating Google Drive...")
 gauth = GoogleAuth()
-gauth.LoadClientConfigFile("client_secrets.json")
-
-# Try loading credentials
-if os.path.exists("gdrive_creds.json"):
-    gauth.LoadCredentialsFile("gdrive_creds.json")
-
-if not gauth.credentials or gauth.credentials.invalid:
+gauth.LoadCredentialsFile("gdrive_creds.json")
+if not gauth.credentials:
     gauth.LocalWebserverAuth()
-    gauth.SaveCredentialsFile("gdrive_creds.json")  # Save credentials after authentication
-
+    gauth.SaveCredentialsFile("gdrive_creds.json")
 drive = GoogleDrive(gauth)
 
 # Function to download video
@@ -65,26 +53,30 @@ def upload_to_gdrive(file_path):
 # Handle start command
 @dp.message_handler(commands=['start'])
 async def start_command(message: types.Message):
+    logging.info(f"📩 Received /start from {message.chat.id}")
     await message.reply("👋 Welcome! Send me a video link to download and upload to Google Drive.")
 
 # Handle video link input
 @dp.message_handler()
 async def process_video(message: types.Message):
     url = message.text.strip()
+    logging.info(f"🔗 Received video link: {url}")
     await message.reply("⏳ Downloading video...")
-
+    
     try:
         file_path = download_video(url)
         await message.reply("✅ Download complete! Uploading to Google Drive...")
-
+        
         file_id = upload_to_gdrive(file_path)
         gdrive_link = f"https://drive.google.com/file/d/{file_id}/view"
-
+        
         await message.reply(f"✅ Upload successful! Here is your link: {gdrive_link}")
-
+    
     except Exception as e:
+        logging.error(f"❌ Error: {e}")
         await message.reply(f"❌ Error: {e}")
 
 # Run bot
 if __name__ == '__main__':
+    logging.info("🟢 Starting bot polling...")
     executor.start_polling(dp, skip_updates=True)
