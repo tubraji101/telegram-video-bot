@@ -1,65 +1,76 @@
-import logging
 import os
+import logging
+import asyncio
 import yt_dlp
 from aiogram import Bot, Dispatcher, types
-from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.utils import executor
+from pydrive.auth import GoogleAuth
+from pydrive.drive import GoogleDrive
+import json
 
-API_TOKEN = "7541428401:AAEE-tQI2qOoHbArMyNDOB--LGGUy4rOeME"
+# Load environment variables
+BOT_TOKEN = os.getenv("BOT_TOKEN")
+GDRIVE_FOLDER_ID = os.getenv("GDRIVE_FOLDER_ID")
+GDRIVE_CREDENTIALS = os.getenv("GDRIVE_CREDENTIALS")
 
-# Initialize bot and dispatcher
-bot = Bot(token=API_TOKEN)
-dp = Dispatcher(bot)
-
+# Setup logging
 logging.basicConfig(level=logging.INFO)
 
-def download_video(url, format_id):
-    options = {
-        'format': format_id,
+# Initialize bot and dispatcher
+bot = Bot(token=BOT_TOKEN)
+dp = Dispatcher(bot)
+
+# Authenticate Google Drive
+logging.info("Authenticating Google Drive...")
+gauth = GoogleAuth()
+gauth.LoadCredentialsFile("gdrive_creds.json")
+if not gauth.credentials:
+    gauth.LocalWebserverAuth()
+    gauth.SaveCredentialsFile("gdrive_creds.json")
+drive = GoogleDrive(gauth)
+
+# Function to download video
+def download_video(url):
+    ydl_opts = {
+        'format': 'best',
         'outtmpl': 'downloads/%(title)s.%(ext)s',
     }
-    with yt_dlp.YoutubeDL(options) as ydl:
+    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         info = ydl.extract_info(url, download=True)
-        return ydl.prepare_filename(info)
+        filename = ydl.prepare_filename(info)
+    return filename
 
+# Function to upload to Google Drive
+def upload_to_gdrive(file_path):
+    file_name = os.path.basename(file_path)
+    gfile = drive.CreateFile({'title': file_name, 'parents': [{'id': GDRIVE_FOLDER_ID}]})
+    gfile.SetContentFile(file_path)
+    gfile.Upload()
+    return gfile['id']
+
+# Handle start command
 @dp.message_handler(commands=['start'])
-async def start(message: types.Message):
-    await message.reply("🔗 Send me a video link to download.")
+async def start_command(message: types.Message):
+    await message.reply("👋 Welcome! Send me a video link to download and upload to Google Drive.")
 
+# Handle video link input
 @dp.message_handler()
-async def fetch_video(message: types.Message):
-    url = message.text
+async def process_video(message: types.Message):
+    url = message.text.strip()
+    await message.reply("⏳ Downloading video...")
     
     try:
-        with yt_dlp.YoutubeDL({'quiet': True}) as ydl:
-            info = ydl.extract_info(url, download=False)
-            formats = info.get('formats', [])
-            buttons = []
-            
-            for fmt in formats:
-                if fmt.get('filesize') and fmt.get('format_note'):
-                    btn = InlineKeyboardButton(
-                        text=f"{fmt['format_note']} ({round(fmt['filesize'] / 1024 / 1024, 2)} MB)",
-                        callback_data=f"download|{url}|{fmt['format_id']}"
-                    )
-                    buttons.append([btn])
-            
-            markup = InlineKeyboardMarkup(inline_keyboard=buttons)
-            await message.reply("📥 Choose the video quality:", reply_markup=markup)
-    except Exception as e:
-        await message.reply(f"❌ Error: {str(e)}")
-
-@dp.callback_query_handler(lambda c: c.data.startswith('download'))
-async def process_download(callback_query: types.CallbackQuery):
-    _, url, format_id = callback_query.data.split('|')
-    await bot.send_message(callback_query.from_user.id, "📥 Downloading video...")
+        file_path = download_video(url)
+        await message.reply("✅ Download complete! Uploading to Google Drive...")
+        
+        file_id = upload_to_gdrive(file_path)
+        gdrive_link = f"https://drive.google.com/file/d/{file_id}/view"
+        
+        await message.reply(f"✅ Upload successful! Here is your link: {gdrive_link}")
     
-    try:
-        file_path = download_video(url, format_id)
-        await bot.send_video(callback_query.from_user.id, video=open(file_path, 'rb'))
-        os.remove(file_path)
     except Exception as e:
-        await bot.send_message(callback_query.from_user.id, f"❌ Download failed: {str(e)}")
+        await message.reply(f"❌ Error: {e}")
 
+# Run bot
 if __name__ == '__main__':
     executor.start_polling(dp, skip_updates=True)
