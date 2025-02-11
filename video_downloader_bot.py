@@ -22,14 +22,25 @@ dp = Dispatcher(bot)
 
 logging.info("🚀 Bot Started! Waiting for commands...")
 
-# Google Drive Authentication
+# Check if GDRIVE_CREDENTIALS exist
+if not GDRIVE_CREDENTIALS:
+    logging.error("❌ GDRIVE_CREDENTIALS not found! Set it in Environment Variables.")
+    exit(1)
+
+# Save credentials file
+with open("client_secrets.json", "w") as f:
+    f.write(GDRIVE_CREDENTIALS)
+
 logging.info("🔑 Authenticating Google Drive...")
-gauth = GoogleAuth()
-gauth.LoadCredentialsFile("gdrive_creds.json")
-if not gauth.credentials:
+try:
+    gauth = GoogleAuth()
+    gauth.LoadClientConfigFile("client_secrets.json")  
     gauth.LocalWebserverAuth()
-    gauth.SaveCredentialsFile("gdrive_creds.json")
-drive = GoogleDrive(gauth)
+    drive = GoogleDrive(gauth)
+    logging.info("✅ Google Drive authentication successful!")
+except Exception as e:
+    logging.error(f"❌ Google Drive Authentication Failed: {e}")
+    exit(1)
 
 # Function to download video
 def download_video(url):
