@@ -32,12 +32,18 @@ drive = GoogleDrive(gauth)
 GDRIVE_CREDENTIALS = os.getenv("GDRIVE_CREDENTIALS")
 
 
+# Check if credentials are found
+if not GDRIVE_CREDENTIALS:
+    raise ValueError("GDRIVE_CREDENTIALS not found! Make sure it's set in Environment Variables.")
+
+
 # Credentials ফাইল তৈরি করা
 with open("client_secrets.json", "w") as f:
     f.write(GDRIVE_CREDENTIALS)
 
 gauth = GoogleAuth()
-gauth.LocalWebserverAuth()  
+gauth.LoadClientConfigFile("client_secrets.json")  # JSON ফাইল লোড করা
+gauth.LocalWebserverAuth()  # অথেনটিকেশন
 drive = GoogleDrive(gauth)
 
 
