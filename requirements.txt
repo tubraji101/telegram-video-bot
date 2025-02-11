@@ -3,3 +3,7 @@ aiohttp
 async-timeout
 python-dotenv
 yt_dlp
+google-auth
+google-auth-oauthlib
+google-auth-httplib2
+google-api-python-client
