@@ -1,3 +1,4 @@
+import json
 import os
 import logging
 import asyncio
@@ -28,6 +29,17 @@ if not gauth.credentials:
     gauth.LocalWebserverAuth()
     gauth.SaveCredentialsFile("gdrive_creds.json")
 drive = GoogleDrive(gauth)
+GDRIVE_CREDENTIALS = os.getenv("GDRIVE_CREDENTIALS")
+
+
+# Credentials ফাইল তৈরি করা
+with open("client_secrets.json", "w") as f:
+    f.write(GDRIVE_CREDENTIALS)
+
+gauth = GoogleAuth()
+gauth.LocalWebserverAuth()  
+drive = GoogleDrive(gauth)
+
 
 # Function to download video
 def download_video(url):
